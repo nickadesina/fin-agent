@@ -60,7 +60,7 @@ CSR TEXT:
 
     resp = client.messages.create(
         model="claude-4-5-sonnet",
-        max_tokens=1200,
+        max_tokens=4000,
         messages=[{"role": "user", "content": prompt}]
     )
 
