@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Altrua AI", page_icon="📊", layout="wide")
 
-ANTHROPIC_API_KEY = "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"
+ANTHROPIC_API_KEY = "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"
 client = Anthropic(api_key=ANTHROPIC_API_KEY)
 
 # -------------------------
