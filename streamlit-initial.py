@@ -27,7 +27,7 @@ with col1:
 
 with col2:
     st.markdown("""
-        <h1 style='font-size: 52px; margin-bottom:-10px;'>📄 CSR Analyzer</h1>
+        <h1 style='font-size: 52px; margin-bottom:-10px;'> Altrua AI</h1>
         <p style='font-size: 20px; color:#aaa;'>Upload CSR/Sustainability reports. Our AI automatically extracts GRI metrics.</p>
     """, unsafe_allow_html=True)
 
