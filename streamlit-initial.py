@@ -42,7 +42,7 @@ if uploaded:
     with st.spinner("Analyzing report… typically 3–6 seconds..."):
         files = {"file": (uploaded.name, uploaded.read(), uploaded.type)}
         resp = requests.post(
-            "https://nicakdesina.app.n8n.cloud/webhook/webhook/csr_upload",
+            "hhttps://nicakdesina.app.n8n.cloud/webhook/csr_upload",
             files=files
         )
 
