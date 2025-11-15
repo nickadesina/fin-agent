@@ -1,19 +1,63 @@
 import streamlit as st
 import requests
+import json
+from streamlit_lottie import st_lottie
 
-st.title("CSR Upload")
+st.set_page_config(
+    page_title="CSR Analyzer",
+    page_icon="📊",
+    layout="wide"
+)
 
-file = st.file_uploader("Upload CSR document", type=["pdf", "xlsx", "csv", "docx"])
-
-if file:
-    files = {
-        "file": (file.name, file.read(), file.type)
+# --- HEADER ---
+st.markdown("""
+    <style>
+    .main-title {
+        font-size: 48px;
+        font-weight: 700;
+        margin-bottom: -10px;
     }
+    .subtitle {
+        font-size: 20px;
+        color: #666;
+        margin-bottom: 40px;
+    }
+    .upload-box {
+        padding: 40px;
+        border-radius: 10px;
+        border: 2px dashed #444;
+        background-color: #1E1E1E20;
+        text-align: center;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-    resp = requests.post(
-        "https://nicakdesina.app.n8n.cloud/webhook-test/webhook/csr_upload",
-        files=files
-    )
+st.markdown('<p class="main-title">📄 CSR Document Analyzer</p>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">Upload your CSR/Sustainability report. Our AI extracts GRI metrics automatically.</p>', unsafe_allow_html=True)
 
-    st.write("Response from n8n:")
-    st.json(resp.json())
+# --- FILE UPLOADER ---
+uploaded = st.file_uploader(
+    "Upload CSR Report (PDF, XLSX, CSV, DOCX)",
+    type=["pdf", "xlsx", "csv", "docx"]
+)
+
+if uploaded:
+    with st.spinner("Analyzing report… this usually takes 3–6 seconds..."):
+        files = {"file": (uploaded.name, uploaded.read(), uploaded.type)}
+
+        resp = requests.post(
+            "YOUR_N8N_WEBHOOK_URL",
+            files=files
+        )
+
+    st.success("Done! Here's what we found:")
+
+    data = resp.json()
+
+    # --- DISPLAY JSON RESULT ---
+    st.json(data, expanded=False)
+
+    # --- OPTIONAL PRETTY SUMMARY ---
+    if "gri_breakdown" in data:
+        st.subheader("GRI Category Coverage")
+        st.bar_chart(data["gri_breakdown"])
