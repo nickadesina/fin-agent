@@ -13,7 +13,7 @@ from anthropic import Anthropic
 
 st.set_page_config(page_title="Altrua AI", page_icon="📊", layout="wide")
 
-ANTHROPIC_API_KEY = st.secrets.get("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", None)
+ANTHROPIC_API_KEY = "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"
 client = Anthropic(api_key=ANTHROPIC_API_KEY)
 
 # -------------------------
