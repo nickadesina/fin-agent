@@ -66,22 +66,27 @@ CSR TEXT:
 """
 
     resp = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
+        model="claude-sonnet-4.5",
         max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}]
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt}
+                ]
+            }
+        ]
     )
 
-    # Parse JSON out of LLM output
     raw = resp.content[0].text.strip()
 
-    # try pure JSON
     try:
         return json.loads(raw)
     except:
-        # fallback: extract JSON between brackets
         start = raw.find("[")
         end = raw.rfind("]")
         return json.loads(raw[start:end+1])
+
 
 def enrich_rows(rows):
     """Replicate the same JavaScript enrichment logic."""
