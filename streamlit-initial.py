@@ -4,7 +4,7 @@ import json
 from streamlit_lottie import st_lottie
 import pandas as pd
 
-st.set_page_config(page_title="CSR Analyzer", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Altrua AI", page_icon="📊", layout="wide")
 
 # ---- Load Lottie Animation ----
 def load_lottie(url):
@@ -42,7 +42,7 @@ if uploaded:
     with st.spinner("Analyzing report… typically 3–6 seconds..."):
         files = {"file": (uploaded.name, uploaded.read(), uploaded.type)}
         resp = requests.post(
-            "YOUR_PRODUCTION_N8N_WEBHOOK_URL",
+            "https://nicakdesina.app.n8n.cloud/webhook/webhook/csr_upload",
             files=files
         )
 
