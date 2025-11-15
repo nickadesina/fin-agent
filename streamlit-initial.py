@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Altrua AI", page_icon="📊", layout="wide")
 
-OPENAI_API_KEY = "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"  # <-- put your key here (or use env var)
+OPENAI_API_KEY = "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"  # <-- put your key here (or use env var)
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # -------------------------
