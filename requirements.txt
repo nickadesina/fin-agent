@@ -4,3 +4,4 @@ streamlit-lottie
 pandas
 PyPDF2
 anthropic
+openai
