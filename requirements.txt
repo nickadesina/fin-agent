@@ -1,4 +1,6 @@
 streamlit
 requests
-pandas
 streamlit-lottie
+pandas
+PyPDF2
+anthropic
