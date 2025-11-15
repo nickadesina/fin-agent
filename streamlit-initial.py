@@ -7,6 +7,13 @@ from streamlit_lottie import st_lottie
 from PyPDF2 import PdfReader
 from anthropic import Anthropic
 
+import traceback
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+
 # -------------------------
 # CONFIG
 # -------------------------
