@@ -5,14 +5,12 @@ import json
 import tempfile
 from streamlit_lottie import st_lottie
 from PyPDF2 import PdfReader
-from anthropic import Anthropic
+from openai import OpenAI  # <<–– OpenAI SDK
 
-import traceback
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 # -------------------------
 # CONFIG
@@ -20,22 +18,24 @@ logger = logging.getLogger(__name__)
 
 st.set_page_config(page_title="Altrua AI", page_icon="📊", layout="wide")
 
-ANTHROPIC_API_KEY = "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"
-client = Anthropic(api_key=ANTHROPIC_API_KEY)
+OPENAI_API_KEY = "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"  # <-- put your key here (or use env var)
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # -------------------------
 # HELPERS
 # -------------------------
 
-def load_lottie(url):
+
+def load_lottie(url: str):
     try:
         r = requests.get(url)
         if r.status_code == 200:
             return r.json()
-    except:
+    except Exception:
         return None
 
-def extract_pdf_text(file):
+
+def extract_pdf_text(file) -> str:
     """Extract plaintext from uploaded PDF."""
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         tmp.write(file.read())
@@ -45,51 +45,45 @@ def extract_pdf_text(file):
     text = "\n".join([page.extract_text() or "" for page in reader.pages])
     return text
 
-def run_llm_extraction(text):
-    """Send CSR text to Claude and return JSON list of extracted items."""
 
-    prompt = f"""
-You are an ESG analyst. Given the CSR text below, identify disclosures and map each
-to GRI codes. Return ONLY a JSON array of objects with:
-
-[
-  {{
-    "section": "...",
-    "gri_code": "...",
-    "confidence": 0.0
-  }},
-  ...
-]
-
-CSR TEXT:
-{text[:6000]}
-"""
-
-    resp = client.messages.create(
-        model="claude-sonnet-4.5",
-        max_tokens=4000,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt}
-                ]
-            }
-        ]
+def run_llm_extraction(text: str):
+    """
+    Send CSR text to OpenAI and return a Python list of
+    {section, gri_code, confidence} items.
+    """
+    system_prompt = (
+        "You are an ESG analyst. Given CSR text, identify disclosures and map "
+        "each to GRI codes. Return ONLY valid JSON: a JSON array where each "
+        "item has fields: section (string), gri_code (string), confidence (0–1)."
     )
 
-    raw = resp.content[0].text.strip()
+    user_prompt = f"CSR TEXT (truncated):\n{text[:6000]}"
 
+    resp = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        temperature=0,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+
+    raw = resp.choices[0].message.content.strip()
+
+    # First try direct JSON parse
     try:
         return json.loads(raw)
-    except:
+    except Exception:
+        # Fallback: grab array between first `[` and last `]`
         start = raw.find("[")
         end = raw.rfind("]")
-        return json.loads(raw[start:end+1])
+        if start == -1 or end == -1:
+            raise ValueError("Model response did not contain JSON array.")
+        return json.loads(raw[start : end + 1])
 
 
 def enrich_rows(rows):
-    """Replicate the same JavaScript enrichment logic."""
+    """Business-logic enrichment layer."""
     enriched = []
     for r in rows:
         section = r.get("section")
@@ -109,8 +103,9 @@ def enrich_rows(rows):
         enriched.append(new)
     return enriched
 
+
 def aggregate(enriched_rows):
-    """Build same summary JSON as your n8n Python node."""
+    """Build dashboard-friendly summary payload."""
     breakdown = {}
     for r in enriched_rows:
         if not r["gri_code"]:
@@ -124,7 +119,7 @@ def aggregate(enriched_rows):
         "organization": "Demo Corp",
         "gri_breakdown": breakdown,
         "low_confidence": low_conf,
-        "full_extraction": enriched_rows
+        "full_extraction": enriched_rows,
     }
 
 
@@ -139,57 +134,73 @@ with col1:
     if lottie_ai:
         st_lottie(lottie_ai, height=180)
 with col2:
-    st.markdown("""
+    st.markdown(
+        """
         <h1 style='font-size:52px;margin-bottom:-10px;'>Altrua AI</h1>
-        <p style='font-size:20px;color:#aaa;'>Upload CSR/Sustainability reports. Our AI automatically extracts GRI metrics.</p>
-    """, unsafe_allow_html=True)
+        <p style='font-size:20px;color:#aaa;'>
+        Upload CSR/Sustainability reports. Our AI automatically extracts GRI metrics.
+        </p>
+        """,
+        unsafe_allow_html=True,
+    )
 
 uploaded = st.file_uploader("Upload CSR Report (PDF)", type=["pdf"])
 
 if uploaded:
-    with st.spinner("Extracting text..."):
-        text = extract_pdf_text(uploaded)
+    try:
+        with st.spinner("Extracting text..."):
+            text = extract_pdf_text(uploaded)
 
-    with st.spinner("Running AI extraction..."):
-        llm_output = run_llm_extraction(text)
+        with st.spinner("Running AI extraction..."):
+            llm_output = run_llm_extraction(text)
 
-    with st.spinner("Enriching and generating dashboard data..."):
-        enriched = enrich_rows(llm_output)
-        data = aggregate(enriched)
+        with st.spinner("Enriching and generating dashboard data..."):
+            enriched = enrich_rows(llm_output)
+            data = aggregate(enriched)
 
-    st.success("Analysis complete!")
+        st.success("Analysis complete!")
 
-    # -------------------------
-    # METRICS
-    # -------------------------
-    colA, colB, colC = st.columns(3)
-    colA.metric("Total Extracted Sections", len(data["full_extraction"]))
-    colB.metric("Distinct GRI Categories", len(data["gri_breakdown"]))
-    colC.metric("Low Confidence Flags", len(data["low_confidence"]))
+        # -------------------------
+        # METRICS
+        # -------------------------
+        colA, colB, colC = st.columns(3)
+        colA.metric("Total Extracted Sections", len(data["full_extraction"]))
+        colB.metric("Distinct GRI Categories", len(data["gri_breakdown"]))
+        colC.metric("Low Confidence Flags", len(data["low_confidence"]))
 
-    # -------------------------
-    # TABS
-    # -------------------------
-    tab1, tab2, tab3 = st.tabs(["📊 GRI Breakdown", "⚠️ Low Confidence", "📄 Full Extraction"])
-
-    with tab1:
-        df_bd = pd.DataFrame.from_dict(data["gri_breakdown"], orient="index")
-        df_bd.columns = ["Count"]
-        st.bar_chart(df_bd)
-
-    with tab2:
-        if not data["low_confidence"]:
-            st.success("No low-confidence fields found.")
-        else:
-            st.warning("These items need human review:")
-            st.table(pd.DataFrame(data["low_confidence"]))
-
-    with tab3:
-        df_full = pd.DataFrame(data["full_extraction"])
-        st.dataframe(df_full, use_container_width=True)
-        st.download_button(
-            "Download CSV",
-            df_full.to_csv(index=False),
-            file_name="csr_extraction.csv",
-            mime="text/csv"
+        # -------------------------
+        # TABS
+        # -------------------------
+        tab1, tab2, tab3 = st.tabs(
+            ["📊 GRI Breakdown", "⚠️ Low Confidence", "📄 Full Extraction"]
         )
+
+        with tab1:
+            if data["gri_breakdown"]:
+                df_bd = pd.DataFrame.from_dict(
+                    data["gri_breakdown"], orient="index", columns=["Count"]
+                )
+                st.bar_chart(df_bd)
+            else:
+                st.info("No GRI codes detected.")
+
+        with tab2:
+            if not data["low_confidence"]:
+                st.success("No low-confidence fields found.")
+            else:
+                st.warning("These items need human review:")
+                st.table(pd.DataFrame(data["low_confidence"]))
+
+        with tab3:
+            df_full = pd.DataFrame(data["full_extraction"])
+            st.dataframe(df_full, use_container_width=True)
+            st.download_button(
+                "Download CSV",
+                df_full.to_csv(index=False),
+                file_name="csr_extraction.csv",
+                mime="text/csv",
+            )
+
+    except Exception as e:
+        logger.exception("Pipeline failed")
+        st.error(f"Something went wrong: {e}")
