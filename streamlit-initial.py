@@ -60,7 +60,7 @@ def run_llm_extraction(text: str):
     user_prompt = f"CSR TEXT (truncated):\n{text[:6000]}"
 
     resp = client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model="gpt-4o-mini",
         temperature=0,
         messages=[
             {"role": "system", "content": system_prompt},
