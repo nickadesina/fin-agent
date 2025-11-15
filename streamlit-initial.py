@@ -2,62 +2,100 @@ import streamlit as st
 import requests
 import json
 from streamlit_lottie import st_lottie
+import pandas as pd
 
-st.set_page_config(
-    page_title="CSR Analyzer",
-    page_icon="📊",
-    layout="wide"
-)
+st.set_page_config(page_title="CSR Analyzer", page_icon="📊", layout="wide")
 
-# --- HEADER ---
-st.markdown("""
-    <style>
-    .main-title {
-        font-size: 48px;
-        font-weight: 700;
-        margin-bottom: -10px;
-    }
-    .subtitle {
-        font-size: 20px;
-        color: #666;
-        margin-bottom: 40px;
-    }
-    .upload-box {
-        padding: 40px;
-        border-radius: 10px;
-        border: 2px dashed #444;
-        background-color: #1E1E1E20;
-        text-align: center;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# ---- Load Lottie Animation ----
+def load_lottie(url):
+    try:
+        r = requests.get(url)
+        if r.status_code == 200:
+            return r.json()
+    except:
+        return None
 
-st.markdown('<p class="main-title">📄 CSR Document Analyzer</p>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">Upload your CSR/Sustainability report. Our AI extracts GRI metrics automatically.</p>', unsafe_allow_html=True)
+lottie_ai = load_lottie("https://assets9.lottiefiles.com/packages/lf20_3rwasyjy.json")
 
-# --- FILE UPLOADER ---
+
+# ---- HEADER ----
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    if lottie_ai:
+        st_lottie(lottie_ai, height=180, key="ai_anim")
+
+with col2:
+    st.markdown("""
+        <h1 style='font-size: 52px; margin-bottom:-10px;'>📄 CSR Analyzer</h1>
+        <p style='font-size: 20px; color:#aaa;'>Upload CSR/Sustainability reports. Our AI automatically extracts GRI metrics.</p>
+    """, unsafe_allow_html=True)
+
+
+# ---- FILE UPLOADER ----
 uploaded = st.file_uploader(
     "Upload CSR Report (PDF, XLSX, CSV, DOCX)",
     type=["pdf", "xlsx", "csv", "docx"]
 )
 
 if uploaded:
-    with st.spinner("Analyzing report… this usually takes 3–6 seconds..."):
+    with st.spinner("Analyzing report… typically 3–6 seconds..."):
         files = {"file": (uploaded.name, uploaded.read(), uploaded.type)}
-
         resp = requests.post(
-            "YOUR_N8N_WEBHOOK_URL",
+            "YOUR_PRODUCTION_N8N_WEBHOOK_URL",
             files=files
         )
 
-    st.success("Done! Here's what we found:")
+    if resp.status_code != 200:
+        st.error("Something went wrong with the server.")
+        st.text(resp.text)
+        st.stop()
 
     data = resp.json()
+    st.success("Analysis complete!")
 
-    # --- DISPLAY JSON RESULT ---
-    st.json(data, expanded=False)
 
-    # --- OPTIONAL PRETTY SUMMARY ---
-    if "gri_breakdown" in data:
-        st.subheader("GRI Category Coverage")
-        st.bar_chart(data["gri_breakdown"])
+    # ---- TOP SUMMARY METRICS ----
+    colA, colB, colC = st.columns(3)
+
+    with colA:
+        st.metric("Total Extracted Sections", len(data["full_extraction"]))
+
+    with colB:
+        st.metric("Distinct GRI Categories", len(data["gri_breakdown"]))
+
+    with colC:
+        st.metric("Low Confidence Flags", len(data["low_confidence"]))
+
+
+    # ---- TABS ----
+    tab1, tab2, tab3 = st.tabs(["📊 GRI Breakdown", "⚠️ Low Confidence", "📄 Full Extraction"])
+
+
+    # --- TAB 1: BAR CHART ---
+    with tab1:
+        df_breakdown = pd.DataFrame.from_dict(data["gri_breakdown"], orient="index")
+        df_breakdown.columns = ["Count"]
+        st.bar_chart(df_breakdown)
+
+
+    # --- TAB 2: LOW CONFIDENCE ---
+    with tab2:
+        if len(data["low_confidence"]) == 0:
+            st.success("No low-confidence fields found. Great extraction quality.")
+        else:
+            st.warning("These items need human review:")
+            st.table(pd.DataFrame(data["low_confidence"]))
+
+
+    # --- TAB 3: FULL EXTRACTION ---
+    with tab3:
+        df_full = pd.DataFrame(data["full_extraction"])
+        st.dataframe(df_full, use_container_width=True)
+
+        st.download_button(
+            "Download CSV",
+            data=df_full.to_csv(index=False),
+            file_name="csr_extraction.csv",
+            mime="text/csv"
+        )
